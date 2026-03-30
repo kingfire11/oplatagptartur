@@ -156,7 +156,7 @@ async def handle_product(callback: types.CallbackQuery):
         await callback.message.answer(
             f"💻 <b>{product['name']}</b>\n\n"
             f"{product['description']}\n\n"
-            f"💵 Цена: <b>{product['amount']}$</b>",
+            f"💵 Цена: <b>{product['price_rub']} ₽</b>",
             parse_mode="HTML",
             reply_markup=get_buy_keyboard(product_id)
         )
@@ -196,7 +196,7 @@ async def handle_buy(callback: types.CallbackQuery):
             f"Товар: {product['name']}\n"
             f"Сумма к оплате: <b>{amount_rub:.2f} ₽</b>\n\n"
             f"Нажмите на ссылку для оплаты:\n"
-            f"<a href='{payment_link}'>💰 Оплатить {product['amount']}$</a>",
+            f"<a href='{payment_link}'>💰 Оплатить</a>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🔙 Назад в магазин", callback_data="shop_back")]
