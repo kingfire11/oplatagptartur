@@ -14,7 +14,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 LAVA_SHOP_ID = os.getenv('LAVA_SHOP_ID')
 LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')
-LAVA_API_URL = "https://business.lava.ru/api/v1/bill/create"
+LAVA_PAYMENT_URL = "https://business.lava.ru/payment/"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -57,20 +57,12 @@ def generate_lava_link(amount: float, description: str = "Оплата зака�
     """Генерирует ссылку на оплату Lava"""
     order_id = f"order_{int(time.time())}"
 
-    # Параметры для подписи
-    params = {
-        "shopId": LAVA_SHOP_ID,
-        "orderId": order_id,
-        "amount": amount,
-        "description": description,
-    }
-
-    # Создаем подпись (SHA256 от shopId:orderId:amount:secretKey)
+    # Создаем подпись (MD5 от shopId:orderId:amount:secretKey)
     sign_string = f"{LAVA_SHOP_ID}:{order_id}:{amount}:{LAVA_SECRET_KEY}"
-    signature = hashlib.sha256(sign_string.encode()).hexdigest()
+    signature = hashlib.md5(sign_string.encode()).hexdigest()
 
-    # Формируем ссылку
-    link = f"{LAVA_API_URL}?shopId={LAVA_SHOP_ID}&orderId={order_id}&amount={amount}&description={description}&signature={signature}"
+    # Формируем ссылку на платежную страницу
+    link = f"{LAVA_PAYMENT_URL}?shopId={LAVA_SHOP_ID}&orderId={order_id}&amount={amount}&signature={signature}"
 
     return link
 
