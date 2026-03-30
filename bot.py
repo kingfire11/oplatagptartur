@@ -90,19 +90,19 @@ PRODUCTS = {
         "name": "Claude Code API 3000$",
         "amount": 3000,
         "price_rub": 3000,
-        "description": "Доступ к Claude Code API на сумму 3000$. Идеально подходит для индивидуальных разработчиков и небольших проектов."
+        "description": "Доступ к API Claude Code для разработки.\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с кредитами.\n\nКредиты не имеют срока действия и могут использоваться в любое время.\n\nДоступны модели:\n• Claude sonnet 4.6\n• Claude sonnet 4.5\n• Claude Opus 4.5\n• Claude Opus 4.6"
     },
     "5000": {
         "name": "Claude Code API 5000$",
         "amount": 5000,
         "price_rub": 4500,
-        "description": "Доступ к Claude Code API на сумму 5000$. Оптимальный выбор для средних команд и растущих проектов."
+        "description": "Доступ к API Claude Code для разработки.\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с кредитами.\n\nКредиты не имеют срока действия и могут использоваться в любое время.\n\nДоступны модели:\n• Claude sonnet 4.6\n• Claude sonnet 4.5\n• Claude Opus 4.5\n• Claude Opus 4.6"
     },
     "10000": {
         "name": "Claude Code API 10000$",
         "amount": 10000,
         "price_rub": 8000,
-        "description": "Доступ к Claude Code API на сумму 10000$. Максимальный пакет для крупных компаний и масштабных проектов."
+        "description": "Доступ к API Claude Code для разработки.\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с кредитами.\n\nКредиты не имеют срока действия и могут использоваться в любое время.\n\nДоступны модели:\n• Claude sonnet 4.6\n• Claude sonnet 4.5\n• Claude Opus 4.5\n• Claude Opus 4.6"
     }
 }
 
