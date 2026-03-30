@@ -119,8 +119,8 @@ async def handle_text(message: types.Message):
         await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
         return
 
-    # Проверяем формат @username сумма
-    pattern = r'^@(\w+)\s+(\d+)$'
+    # Проверяем формат: username сумма (с @ или без)
+    pattern = r'^@?(\w+)\s+(\d+)$'
     match = re.match(pattern, message.text)
 
     if match:
@@ -141,8 +141,7 @@ async def handle_text(message: types.Message):
             parse_mode="HTML"
         )
     else:
-        # Для отладки: показываем, что получили
-        await message.answer(f"Текст: {message.text}\nВаш ID: {message.from_user.id}\nADMIN_ID: {ADMIN_ID}")
+        await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
 
 
 @dp.callback_query(F.data == "docs_back")
