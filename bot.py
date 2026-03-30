@@ -88,19 +88,25 @@ PRODUCTS = {
     "3000": {
         "name": "Claude Code API 3000$",
         "amount": 3000,
+        "price_rub": 3000,
         "description": "Доступ к Claude Code API на сумму 3000$. Идеально подходит для индивидуальных разработчиков и небольших проектов."
     },
     "5000": {
         "name": "Claude Code API 5000$",
         "amount": 5000,
+        "price_rub": 4500,
         "description": "Доступ к Claude Code API на сумму 5000$. Оптимальный выбор для средних команд и растущих проектов."
     },
     "10000": {
         "name": "Claude Code API 10000$",
         "amount": 10000,
+        "price_rub": 8000,
         "description": "Доступ к Claude Code API на сумму 10000$. Максимальный пакет для крупных компаний и масштабных проектов."
     }
 }
+
+# ID администратора для уведомлений
+ADMIN_ID = 7320849294  # Ваш Telegram ID
 
 
 @dp.callback_query(F.data == "docs_back")
@@ -163,9 +169,26 @@ async def handle_buy(callback: types.CallbackQuery):
     product = PRODUCTS.get(product_id)
 
     if product:
-        # Генерируем ссылку на оплату (конвертируем USD в RUB по курсу ~90)
-        amount_rub = product['amount'] * 90
+        amount_rub = product['price_rub']
         payment_link = generate_lava_link(amount_rub)
+
+        # Отправляем уведомление администратору
+        try:
+            buyer = callback.from_user
+            await bot.send_message(
+                chat_id=ADMIN_ID,
+                text=(
+                    f"🛒 <b>Новая покупка!</b>\n\n"
+                    f"👤 Покупатель: @{buyer.username or 'нет username'}\n"
+                    f"📝 Имя: {buyer.full_name}\n"
+                    f"🆔 ID: {buyer.id}\n"
+                    f"📦 Товар: {product['name']}\n"
+                    f"💰 Цена: {amount_rub} ₽"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass  # Если не удалось отправить уведомление, продолжаем
 
         await callback.message.answer(
             f"🛒 <b>Оформление заказа</b>\n\n"
