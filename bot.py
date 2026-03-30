@@ -100,17 +100,12 @@ PRODUCTS = {
 }
 
 # ID администратора для уведомлений
-ADMIN_ID = 7320849294  # Ваш Telegram ID
+ADMIN_ID = 6499414636  # Ваш Telegram ID
 
 
 @dp.message(F.text)
 async def handle_text(message: types.Message):
     """Обработка текстовых сообщений"""
-    # Проверяем, от администратора ли сообщение
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
-        return
-
     # Проверяем формат: username сумма (с @ или без)
     pattern = r'^@?(\w+)\s+(\d+)$'
     match = re.match(pattern, message.text)
@@ -122,7 +117,24 @@ async def handle_text(message: types.Message):
         # Генерируем ссылку
         payment_link = generate_lava_link(amount, f"Оплата для @{username}")
 
-        # Отправляем ссылку администратору
+        # Отправляем уведомление администратору
+        try:
+            buyer = message.from_user
+            await bot.send_message(
+                chat_id=ADMIN_ID,
+                text=(
+                    f"🛒 <b>Новый заказ!</b>\n\n"
+                    f"👤 Покупатель: @{buyer.username or 'нет username'}\n"
+                    f"📝 Имя: {buyer.full_name}\n"
+                    f"🆔 ID: {buyer.id}\n"
+                    f"💰 Сумма: {amount} ₽"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass  # Если не удалось отправить уведомление, продолжаем
+
+        # Отправляем ссылку пользователю
         await message.answer(
             f"💰 <b>Ссылка для оплаты создана</b>\n\n"
             f"👤 Пользователь: @{username}\n"
