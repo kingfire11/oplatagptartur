@@ -141,7 +141,8 @@ async def handle_text(message: types.Message):
             parse_mode="HTML"
         )
     else:
-        await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
+        # Для отладки: показываем, что получили
+        await message.answer(f"Текст: {message.text}\nВаш ID: {message.from_user.id}\nADMIN_ID: {ADMIN_ID}")
 
 
 @dp.callback_query(F.data == "docs_back")
