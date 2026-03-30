@@ -38,7 +38,7 @@ def get_products_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="💻 Claude Code API 3000$", callback_data="product_3000")],
         [InlineKeyboardButton(text="💻 Claude Code API 5000$", callback_data="product_5000")],
         [InlineKeyboardButton(text="💻 Claude Code API 10000$", callback_data="product_10000")],
-        [InlineKeyboardButton(text="🔙 Назад", callback_data="shop_back")],
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
     ])
     return keyboard
 
@@ -47,7 +47,7 @@ def get_buy_keyboard(product_id: str) -> InlineKeyboardMarkup:
     """Клавиатура с кнопкой купить"""
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💰 Купить", callback_data=f"buy_{product_id}")],
-        [InlineKeyboardButton(text="🔙 Назад", callback_data="shop_back")],
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
     ])
     return keyboard
 
@@ -134,14 +134,14 @@ async def handle_shop_main(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query(F.data == "shop_back")
-async def handle_shop_back(callback: types.CallbackQuery):
-    """Вернуться в магазин из товара"""
+@dp.callback_query(F.data == "main_menu")
+async def handle_main_menu(callback: types.CallbackQuery):
+    """Вернуться в главное меню"""
     await callback.message.answer(
-        "💎 <b>Магазин Claude Code API</b>\n\n"
-        "Выберите товар для покупки:",
-        parse_mode="HTML",
-        reply_markup=get_products_keyboard()
+        "👋 Привет! Я бот магазина Claude Code API.\n\n"
+        "Нажмите кнопку 💳 Купить, чтобы выбрать товар,\n"
+        "или обратитесь в техподдержку за помощью.",
+        reply_markup=get_main_keyboard()
     )
     await callback.answer()
 
@@ -199,7 +199,7 @@ async def handle_buy(callback: types.CallbackQuery):
             f"<a href='{payment_link}'>💰 Оплатить</a>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔙 Назад в магазин", callback_data="shop_back")]
+                [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")]
             ])
         )
     await callback.answer()
