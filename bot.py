@@ -23,7 +23,7 @@ dp = Dispatcher()
 def get_main_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура с основными кнопками"""
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 Купить", callback_data="shop_main")],
+        [InlineKeyboardButton(text="💳 Купить API", callback_data="shop_main")],
         [InlineKeyboardButton(text="🛠 Техподдержка", url="https://t.me/claudxeseller")],
         [InlineKeyboardButton(text="📄 Публичная оферта", callback_data="docs_offer")],
         [InlineKeyboardButton(text="🔒 Политика конфиденциальности", callback_data="docs_privacy")],
