@@ -1,6 +1,7 @@
 import os
 import hashlib
 import time
+import re
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -108,6 +109,39 @@ PRODUCTS = {
 
 # ID администратора для уведомлений
 ADMIN_ID = 7320849294  # Ваш Telegram ID
+
+
+@dp.message(F.text)
+async def handle_text(message: types.Message):
+    """Обработка текстовых сообщений"""
+    # Проверяем, от администратора ли сообщение
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
+        return
+
+    # Проверяем формат @username сумма
+    pattern = r'^@(\w+)\s+(\d+)$'
+    match = re.match(pattern, message.text)
+
+    if match:
+        username = match.group(1)
+        amount = int(match.group(2))
+
+        # Генерируем ссылку
+        payment_link = generate_lava_link(amount, f"Оплата для @{username}")
+
+        # Отправляем ссылку администратору
+        await message.answer(
+            f"💰 <b>Ссылка для оплаты создана</b>\n\n"
+            f"👤 Пользователь: @{username}\n"
+            f"💵 Сумма: <b>{amount} ₽</b>\n\n"
+            f"🔗 Ссылка:\n"
+            f"<code>{payment_link}</code>\n\n"
+            f"<a href='{payment_link}'>💰 Открыть ссылку</a>",
+            parse_mode="HTML"
+        )
+    else:
+        await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
 
 
 @dp.callback_query(F.data == "docs_back")
@@ -304,12 +338,6 @@ async def handle_docs(callback: types.CallbackQuery):
             reply_markup=keyboard
         )
     await callback.answer()
-
-
-@dp.message(F.text)
-async def handle_text(message: types.Message):
-    """Обработка любых текстовых сообщений - показываем ошибку"""
-    await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
 
 
 async def main():
