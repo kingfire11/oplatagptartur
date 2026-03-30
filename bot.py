@@ -297,12 +297,9 @@ async def handle_docs(callback: types.CallbackQuery):
 
 
 @dp.message(F.text)
-async def handle_amount(message: types.Message):
-    """Обработка текстовых сообщений - показываем ошибку"""
-    await message.answer(
-        "❌ Для покупки товаров используйте кнопку 💳 Купить в меню.\n\n"
-        "Ввод суммы вручную временно недоступен."
-    )
+async def handle_text(message: types.Message):
+    """Обработка любых текстовых сообщений - показываем ошибку"""
+    await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
 
 
 async def main():
