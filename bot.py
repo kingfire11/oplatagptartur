@@ -57,7 +57,7 @@ def get_buy_keyboard(product_id: str) -> InlineKeyboardMarkup:
     return keyboard
 
 
-async def create_lava_invoice(amount: float, order_id: str) -> str:
+async def create_lava_invoice(amount: float, order_id: str, username: str = None) -> str:
     """Создаёт счёт на оплату через Lava API"""
     # Формируем тело запроса
     body = {
@@ -65,6 +65,10 @@ async def create_lava_invoice(amount: float, order_id: str) -> str:
         "sum": float(amount),
         "orderId": order_id,
     }
+
+    # Добавляем никнейм в комментарий, если есть
+    if username:
+        body["comment"] = f"Order from @{username}"
 
     # Формируем подпись: HMAC-SHA256 от JSON тела запроса с Secret Key
     body_json = json.dumps(body)
@@ -138,7 +142,7 @@ async def handle_text(message: types.Message):
 
         try:
             # Создаём счёт через API
-            payment_link = await create_lava_invoice(amount, order_id)
+            payment_link = await create_lava_invoice(amount, order_id, username)
 
             # Отправляем уведомление администратору
             buyer = message.from_user
@@ -233,10 +237,11 @@ async def handle_buy(callback: types.CallbackQuery):
     if product:
         amount_rub = product['price_rub']
         order_id = f"order_{int(time.time())}"
+        username = callback.from_user.username
 
         try:
             # Создаём счёт через API
-            payment_link = await create_lava_invoice(amount_rub, order_id)
+            payment_link = await create_lava_invoice(amount_rub, order_id, username)
 
             # Отправляем уведомление администратору
             buyer = callback.from_user
