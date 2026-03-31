@@ -19,6 +19,7 @@ LAVA_SHOP_ID = os.getenv('LAVA_SHOP_ID')  # UUID проекта
 LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')  # Секретный ключ
 LAVA_ADDITIONAL_KEY = os.getenv('LAVA_ADDITIONAL_KEY')  # Дополнительный ключ
 LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
+WEBHOOK_URL = os.getenv('WEBHOOK_URL', 'https://claudeapi.bothost.ru')  # URL сервера
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
