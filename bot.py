@@ -165,11 +165,11 @@ async def handle_text(message: types.Message):
         await message.answer(
             f"💰 <b>Ссылка для оплаты создана</b>\n\n"
             f"👤 Пользователь: @{username}\n"
-            f"💵 Сумма: <b>{amount} ₽</b>\n\n"
-            f"🔗 Ссылка:\n"
-            f"<code>{payment_link}</code>\n\n"
-            f"<a href='{payment_link}'>💰 Открыть ссылку</a>",
-            parse_mode="HTML"
+            f"💵 Сумма: <b>{amount} ₽</b>",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💰 Оплатить", url=payment_link)]
+            ])
         )
     else:
         await message.answer("❌ Для покупки товаров используйте кнопку 💳 Купить в меню.")
@@ -265,11 +265,10 @@ async def handle_buy(callback: types.CallbackQuery):
         await callback.message.answer(
             f"🛒 <b>Оформление заказа</b>\n\n"
             f"Товар: {product['name']}\n"
-            f"Сумма к оплате: <b>{amount_rub:.2f} ₽</b>\n\n"
-            f"Нажмите на ссылку для оплаты:\n"
-            f"<a href='{payment_link}'>💰 Оплатить</a>",
+            f"Сумма к оплате: <b>{amount_rub:.2f} ₽</b>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="💰 Оплатить", url=payment_link)],
                 [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")]
             ])
         )
