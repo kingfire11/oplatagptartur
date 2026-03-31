@@ -1,7 +1,10 @@
 import os
 import hashlib
+import hmac
 import time
 import re
+import aiohttp
+import json
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -14,7 +17,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 LAVA_WALLET = os.getenv('LAVA_WALLET')  # Ваш номер счёта (например, R11553681)
 LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')  # Секретный ключ
-LAVA_CREATE_URL = "https://p2p.lava.ru/create"  # URL для создания счёта
+LAVA_ADDITIONAL_KEY = os.getenv('LAVA_ADDITIONAL_KEY')  # Дополнительный ключ
+LAVA_API_URL = "https://api.lava.ru/invoice/create"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -53,16 +57,36 @@ def get_buy_keyboard(product_id: str) -> InlineKeyboardMarkup:
     return keyboard
 
 
-def generate_lava_link(amount: float, order_id: str) -> str:
-    """Генерирует ссылку на оплату через Lava (устаревший метод)"""
-    # Формируем строку для подписи: wallet:amount:secret_key:order_id
-    sign_string = f"{LAVA_WALLET}:{amount}:{LAVA_SECRET_KEY}:{order_id}"
-    signature = hashlib.md5(sign_string.encode()).hexdigest()
+async def create_lava_invoice(amount: float, order_id: str) -> str:
+    """Создаёт счёт на оплату через Lava API"""
+    # Формируем подпись используя HMAC-SHA256 с дополнительным ключом
+    # Путь + метод + тело запроса
+    body = json.dumps({
+        "wallet_to": LAVA_WALLET,
+        "sum": float(amount),
+        "order_id": order_id
+    })
 
-    # Формируем ссылку
-    link = f"{LAVA_CREATE_URL}?w={LAVA_WALLET}&ao={amount}&o={order_id}&s={signature}"
+    # Подпись: HMAC-SHA256 от тела запроса с дополнительным ключом
+    signature = hmac.new(
+        LAVA_ADDITIONAL_KEY.encode(),
+        body.encode(),
+        hashlib.sha256
+    ).hexdigest()
 
-    return link
+    headers = {
+        "Authorization": f"Bearer {signature}",
+        "Content-Type": "application/json"
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(LAVA_API_URL, json={"wallet_to": LAVA_WALLET, "sum": float(amount), "order_id": order_id}, headers=headers) as response:
+            result = await response.json()
+
+            if result.get("status") == "success":
+                return result.get("url")
+            else:
+                raise Exception(f"Lava API error: {result.get('message', 'Unknown error')}")
 
 
 @dp.message(Command("start"))
@@ -113,11 +137,11 @@ async def handle_text(message: types.Message):
         amount = int(match.group(2))
         order_id = f"order_{int(time.time())}"
 
-        # Генерируем ссылку
-        payment_link = generate_lava_link(amount, order_id)
-
-        # Отправляем уведомление администратору
         try:
+            # Создаём счёт через API
+            payment_link = await create_lava_invoice(amount, order_id)
+
+            # Отправляем уведомление администратору
             buyer = message.from_user
             await bot.send_message(
                 chat_id=ADMIN_ID,
@@ -130,8 +154,9 @@ async def handle_text(message: types.Message):
                 ),
                 parse_mode="HTML"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            await message.answer(f"❌ Ошибка создания счёта: {str(e)}")
+            return
 
         # Отправляем ссылку пользователю
         await message.answer(
@@ -210,11 +235,11 @@ async def handle_buy(callback: types.CallbackQuery):
         amount_rub = product['price_rub']
         order_id = f"order_{int(time.time())}"
 
-        # Генерируем ссылку
-        payment_link = generate_lava_link(amount_rub, order_id)
-
-        # Отправляем уведомление администратору
         try:
+            # Создаём счёт через API
+            payment_link = await create_lava_invoice(amount_rub, order_id)
+
+            # Отправляем уведомление администратору
             buyer = callback.from_user
             await bot.send_message(
                 chat_id=ADMIN_ID,
@@ -228,8 +253,10 @@ async def handle_buy(callback: types.CallbackQuery):
                 ),
                 parse_mode="HTML"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            await callback.message.answer(f"❌ Ошибка создания счёта: {str(e)}")
+            await callback.answer()
+            return
 
         await callback.message.answer(
             f"🛒 <b>Оформление заказа</b>\n\n"
