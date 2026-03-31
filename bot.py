@@ -15,10 +15,10 @@ load_dotenv()
 
 # Настройки
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-LAVA_WALLET = os.getenv('LAVA_WALLET')  # Ваш номер счёта (например, R11553681)
+LAVA_SHOP_ID = os.getenv('LAVA_SHOP_ID')  # UUID проекта
 LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')  # Секретный ключ
 LAVA_ADDITIONAL_KEY = os.getenv('LAVA_ADDITIONAL_KEY')  # Дополнительный ключ
-LAVA_API_URL = "https://api.lava.ru/invoice/create"
+LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -59,34 +59,33 @@ def get_buy_keyboard(product_id: str) -> InlineKeyboardMarkup:
 
 async def create_lava_invoice(amount: float, order_id: str) -> str:
     """Создаёт счёт на оплату через Lava API"""
-    # Формируем подпись используя HMAC-SHA256 с дополнительным ключом
-    # Путь + метод + тело запроса
-    body = json.dumps({
-        "wallet_to": LAVA_WALLET,
+    # Формируем тело запроса
+    body = {
+        "shopId": LAVA_SHOP_ID,
         "sum": float(amount),
-        "order_id": order_id
-    })
+        "orderId": order_id,
+    }
 
-    # Подпись: HMAC-SHA256 от тела запроса с дополнительным ключом
-    signature = hmac.new(
-        LAVA_ADDITIONAL_KEY.encode(),
-        body.encode(),
-        hashlib.sha256
-    ).hexdigest()
+    # Формируем подпись: HMAC-SHA256 от JSON тела запроса с Secret Key
+    body_json = json.dumps(body, separators=(',', ':'))
+    signature = hmac.new(LAVA_SECRET_KEY.encode(), body_json.encode(), hashlib.sha256).hexdigest()
 
     headers = {
-        "Authorization": f"Bearer {signature}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Signature": signature
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(LAVA_API_URL, json={"wallet_to": LAVA_WALLET, "sum": float(amount), "order_id": order_id}, headers=headers) as response:
+        async with session.post(LAVA_API_URL, json=body, headers=headers) as response:
             result = await response.json()
 
-            if result.get("status") == "success":
-                return result.get("url")
+            if result.get("status") == 200 or result.get("status_check") == True:
+                data = result.get("data", {})
+                return data.get("url")
             else:
-                raise Exception(f"Lava API error: {result.get('message', 'Unknown error')}")
+                error = result.get("error", "Unknown error")
+                raise Exception(f"Lava API error: {error}")
 
 
 @dp.message(Command("start"))
