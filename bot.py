@@ -67,7 +67,7 @@ async def create_lava_invoice(amount: float, order_id: str) -> str:
     }
 
     # Формируем подпись: HMAC-SHA256 от JSON тела запроса с Secret Key
-    body_json = json.dumps(body, separators=(',', ':'))
+    body_json = json.dumps(body)
     signature = hmac.new(LAVA_SECRET_KEY.encode(), body_json.encode(), hashlib.sha256).hexdigest()
 
     headers = {
