@@ -12,9 +12,9 @@ load_dotenv()
 
 # Настройки
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-LAVA_SHOP_ID = os.getenv('LAVA_SHOP_ID')
-LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')
-LAVA_PAYMENT_URL = "https://business.lava.ru/payment/"
+LAVA_WALLET = os.getenv('LAVA_WALLET')  # Ваш номер счёта (например, R11553681)
+LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')  # Секретный ключ
+LAVA_CREATE_URL = "https://p2p.lava.ru/create"  # URL для создания счёта
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -53,16 +53,14 @@ def get_buy_keyboard(product_id: str) -> InlineKeyboardMarkup:
     return keyboard
 
 
-def generate_lava_link(amount: float, description: str = "Оплата заказа") -> str:
-    """Генерирует ссылку на оплату Lava"""
-    order_id = f"order_{int(time.time())}"
-
-    # Создаем подпись (MD5 от shopId:orderId:amount:secretKey)
-    sign_string = f"{LAVA_SHOP_ID}:{order_id}:{amount}:{LAVA_SECRET_KEY}"
+def generate_lava_link(amount: float, order_id: str) -> str:
+    """Генерирует ссылку на оплату через Lava (устаревший метод)"""
+    # Формируем строку для подписи: wallet:amount:secret_key:order_id
+    sign_string = f"{LAVA_WALLET}:{amount}:{LAVA_SECRET_KEY}:{order_id}"
     signature = hashlib.md5(sign_string.encode()).hexdigest()
 
-    # Формируем ссылку на платежную страницу
-    link = f"{LAVA_PAYMENT_URL}?shopId={LAVA_SHOP_ID}&orderId={order_id}&amount={amount}&signature={signature}"
+    # Формируем ссылку
+    link = f"{LAVA_CREATE_URL}?w={LAVA_WALLET}&ao={amount}&o={order_id}&s={signature}"
 
     return link
 
@@ -113,9 +111,10 @@ async def handle_text(message: types.Message):
     if match:
         username = match.group(1)
         amount = int(match.group(2))
+        order_id = f"order_{int(time.time())}"
 
         # Генерируем ссылку
-        payment_link = generate_lava_link(amount, f"Оплата для @{username}")
+        payment_link = generate_lava_link(amount, order_id)
 
         # Отправляем уведомление администратору
         try:
@@ -132,7 +131,7 @@ async def handle_text(message: types.Message):
                 parse_mode="HTML"
             )
         except Exception:
-            pass  # Если не удалось отправить уведомление, продолжаем
+            pass
 
         # Отправляем ссылку пользователю
         await message.answer(
@@ -209,7 +208,10 @@ async def handle_buy(callback: types.CallbackQuery):
 
     if product:
         amount_rub = product['price_rub']
-        payment_link = generate_lava_link(amount_rub)
+        order_id = f"order_{int(time.time())}"
+
+        # Генерируем ссылку
+        payment_link = generate_lava_link(amount_rub, order_id)
 
         # Отправляем уведомление администратору
         try:
@@ -227,7 +229,7 @@ async def handle_buy(callback: types.CallbackQuery):
                 parse_mode="HTML"
             )
         except Exception:
-            pass  # Если не удалось отправить уведомление, продолжаем
+            pass
 
         await callback.message.answer(
             f"🛒 <b>Оформление заказа</b>\n\n"
