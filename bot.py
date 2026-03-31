@@ -65,6 +65,7 @@ async def create_lava_invoice(amount: float, order_id: str, username: str = None
         "shopId": LAVA_SHOP_ID,
         "sum": float(amount),
         "orderId": order_id,
+        "hookUrl": f"{WEBHOOK_URL}/lava/webhook",  # URL для уведомлений об оплате
     }
 
     # Добавляем никнейм в комментарий, если есть

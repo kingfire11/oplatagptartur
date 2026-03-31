@@ -31,22 +31,32 @@ async def handle_lava_webhook(request):
     try:
         # Получаем тело запроса
         body = await request.read()
-        signature = request.headers.get('Signature', '')
+
+        # Подпись может быть в заголовке Authorization или Signature
+        signature = request.headers.get('Authorization', '') or request.headers.get('Signature', '')
+
+        # Убираем префикс "Bearer " если есть
+        if signature.startswith('Bearer '):
+            signature = signature[7:]
 
         # Проверяем подпись (опционально, но рекомендуется)
         if signature and not verify_lava_signature(body, signature):
+            print(f"Invalid signature: {signature}")
             return web.json_response({'error': 'Invalid signature'}, status=403)
 
         # Парсим JSON
         data = json.loads(body)
 
+        print(f"Webhook received: {data}")
+
         order_id = data.get('orderId')
         amount = data.get('sum')
         status = data.get('status')  # 1 = успешно, 0 = ожидает
         shop_id = data.get('shopId')
+        type_event = data.get('type')  # 1 = счет, 2 = выплата
 
-        # Проверяем статус оплаты
-        if status == 1:  # Оплата успешна
+        # Проверяем статус оплаты (status=1 означает успешно оплачено)
+        if status == 1:
             async with aiohttp.ClientSession() as session:
                 await session.post(bot_url, json={
                     'chat_id': ADMIN_ID,
@@ -58,6 +68,9 @@ async def handle_lava_webhook(request):
                     ),
                     'parse_mode': 'HTML'
                 })
+            print(f"Payment success: order={order_id}, amount={amount}")
+        else:
+            print(f"Payment pending: order={order_id}, status={status}")
 
         return web.json_response({'status': 'ok'})
 
