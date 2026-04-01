@@ -3,6 +3,8 @@ import json
 import hashlib
 import hmac
 import asyncio
+import time
+import re
 from aiohttp import web
 import aiohttp
 from aiogram import Bot, Dispatcher, types
@@ -254,6 +256,7 @@ async def handle_buy(callback: types.CallbackQuery):
         amount_rub = product['price_rub']
         order_id = f"order_{int(time.time())}"
         username = callback.from_user.username
+        buyer = callback.from_user
 
         try:
             payment_link = await create_lava_invoice(amount_rub, order_id, username)
