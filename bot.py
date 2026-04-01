@@ -330,9 +330,9 @@ async def start_web():
     app = create_web_app()
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    site = web.TCPSite(runner, '0.0.0.0', 3000)
     await site.start()
-    print("Web server started on port 8080")
+    print("Web server started on port 3000")
 
 
 async def main():
