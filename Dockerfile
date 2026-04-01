@@ -14,5 +14,5 @@ RUN mkdir -p /app/data && chmod 777 /app/data
 
 ENV DATA_DIR=/app/data
 
-# Запускаем webhook сервер
-CMD ["python", "http_wrapper.py"]
+# Запускаем бота + webhook сервер
+CMD ["python", "main.py"]
