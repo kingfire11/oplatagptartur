@@ -5,6 +5,7 @@ import hmac
 import asyncio
 import time
 import re
+import logging
 from aiohttp import web
 import aiohttp
 from aiogram import Bot, Dispatcher, types
@@ -12,21 +13,54 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import F
 from dotenv import load_dotenv
+from html import escape as html_escape
 
 load_dotenv()
+
+# Логирование
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Настройки
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 LAVA_SHOP_ID = os.getenv('LAVA_SHOP_ID')
 LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')
 LAVA_ADDITIONAL_KEY = os.getenv('LAVA_ADDITIONAL_KEY')
-LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
-WEBHOOK_URL = os.getenv('WEBHOOK_URL', 'https://claudeapi.bothost.ru')
+WEBHOOK_URL = os.getenv('WEBHOOK_URL')
+if not WEBHOOK_URL:
+    raise ValueError("WEBHOOK_URL не установлен! Добавьте переменную окружения WEBHOOK_URL")
+
 ADMIN_ID = int(os.getenv('ADMIN_ID', '6499414636'))
+LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
+
+# Защита от дублирования webhook
+_processed_orders: set = set()
+
+# Rate limiting: {user_id: timestamp}
+_last_request_time: dict[int, float] = {}
+RATE_LIMIT_SECONDS = 30
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+
+def check_rate_limit(user_id: int) -> bool:
+    """Проверяет, не превышен ли лимит запросов. Возвращает True если можно продолжать"""
+    now = time.time()
+    last_time = _last_request_time.get(user_id, 0)
+    if now - last_time < RATE_LIMIT_SECONDS:
+        return False
+    _last_request_time[user_id] = now
+    return True
+
+
+def sanitize_html(text: str) -> str:
+    """Экранирует спецсимволы для HTML parse_mode"""
+    return html_escape(str(text))
 
 
 # ==================== LAVA WEBHOOK ====================
@@ -50,32 +84,38 @@ async def handle_lava_webhook(request):
             signature = signature[7:]
 
         if signature and not verify_lava_signature(body, signature):
-            print(f"Invalid signature: {signature}")
+            logger.warning("Invalid webhook signature")
             return web.json_response({'error': 'Invalid signature'}, status=403)
 
         data = json.loads(body)
-        print(f"Webhook received: {data}")
+        logger.info(f"Webhook received: {data}")
 
         order_id = data.get('orderId')
         amount = data.get('sum')
         status = data.get('status')
 
+        # Защита от дублирования уведомлений
         if status == 1:
+            if order_id in _processed_orders:
+                logger.info(f"Duplicate webhook for order {order_id}, skipping")
+                return web.json_response({'status': 'ok'})
+
+            _processed_orders.add(order_id)
             await bot.send_message(
                 chat_id=ADMIN_ID,
                 text=(
                     f"✅ <b>Оплата прошла успешно!</b>\n\n"
-                    f"📦 Заказ: {order_id}\n"
+                    f"📦 Заказ: {sanitize_html(order_id)}\n"
                     f"💰 Сумма: {amount} ₽"
                 ),
                 parse_mode="HTML"
             )
-            print(f"Payment success: order={order_id}, amount={amount}")
+            logger.info(f"Payment success: order={order_id}, amount={amount}")
 
         return web.json_response({'status': 'ok'})
     except Exception as e:
-        print(f"Webhook error: {e}")
-        return web.json_response({'error': str(e)}, status=500)
+        logger.error(f"Webhook error: {e}")
+        return web.json_response({'error': 'Internal server error'}, status=500)
 
 
 async def handle_health(request):
@@ -167,6 +207,20 @@ async def handle_text(message: types.Message):
     if match:
         username = match.group(1)
         amount = int(match.group(2))
+
+        # Валидация суммы
+        if amount <= 0:
+            await message.answer("❌ Сумма должна быть больше 0.")
+            return
+        if amount > 100000:
+            await message.answer("❌ Максимальная сумма — 100 000 ₽.")
+            return
+
+        # Rate limiting
+        if not check_rate_limit(message.from_user.id):
+            await message.answer("⏳ Подождите 30 секунд между запросами.")
+            return
+
         order_id = f"order_{int(time.time())}"
 
         try:
@@ -176,20 +230,22 @@ async def handle_text(message: types.Message):
                 chat_id=ADMIN_ID,
                 text=(
                     f"🛒 <b>Новый заказ!</b>\n\n"
-                    f"👤 Покупатель: @{buyer.username or 'нет username'}\n"
-                    f"📝 Имя: {buyer.full_name}\n"
+                    f"👤 Покупатель: @{sanitize_html(buyer.username or 'нет username')}\n"
+                    f"📝 Имя: {sanitize_html(buyer.full_name)}\n"
                     f"🆔 ID: {buyer.id}\n"
                     f"💰 Сумма: {amount} ₽"
                 ),
                 parse_mode="HTML"
             )
+            logger.info(f"Order created by {buyer.id}: {order_id}, {amount}₽")
         except Exception as e:
+            logger.error(f"Failed to create invoice: {e}")
             await message.answer(f"❌ Ошибка создания счёта: {str(e)}")
             return
 
         await message.answer(
             f"💰 <b>Ссылка для оплаты создана</b>\n\n"
-            f"👤 Пользователь: @{username}\n"
+            f"👤 Пользователь: {sanitize_html(username)}\n"
             f"💵 Сумма: <b>{amount} ₽</b>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -258,28 +314,35 @@ async def handle_buy(callback: types.CallbackQuery):
         username = callback.from_user.username
         buyer = callback.from_user
 
+        # Rate limiting
+        if not check_rate_limit(buyer.id):
+            await callback.answer("Подождите 30 секунд между запросами", show_alert=False)
+            return
+
         try:
             payment_link = await create_lava_invoice(amount_rub, order_id, username)
             await bot.send_message(
                 chat_id=ADMIN_ID,
                 text=(
                     f"🛒 <b>Новая покупка!</b>\n\n"
-                    f"👤 Покупатель: @{buyer.username or 'нет username'}\n"
-                    f"📝 Имя: {buyer.full_name}\n"
+                    f"👤 Покупатель: @{sanitize_html(buyer.username or 'нет username')}\n"
+                    f"📝 Имя: {sanitize_html(buyer.full_name)}\n"
                     f"🆔 ID: {buyer.id}\n"
-                    f"📦 Товар: {product['name']}\n"
+                    f"📦 Товар: {sanitize_html(product['name'])}\n"
                     f"💰 Цена: {amount_rub} ₽"
                 ),
                 parse_mode="HTML"
             )
+            logger.info(f"Purchase by {buyer.id}: {product['name']}, {amount_rub}₽")
         except Exception as e:
+            logger.error(f"Failed to create invoice for buy: {e}")
             await callback.message.answer(f"❌ Ошибка создания счёта: {str(e)}")
             await callback.answer()
             return
 
         await callback.message.answer(
             f"🛒 <b>Оформление заказа</b>\n\n"
-            f"Товар: {product['name']}\n"
+            f"Товар: {sanitize_html(product['name'])}\n"
             f"Сумма к оплате: <b>{amount_rub:.2f} ₽</b>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -317,7 +380,11 @@ async def handle_docs(callback: types.CallbackQuery):
 
 async def start_bot():
     """Запуск Telegram бота"""
-    await dp.start_polling(bot)
+    try:
+        logger.info("Starting Telegram bot...")
+        await dp.start_polling(bot)
+    except Exception as e:
+        logger.error(f"Telegram bot error: {e}")
 
 
 def create_web_app():
@@ -330,12 +397,16 @@ def create_web_app():
 
 async def start_web():
     """Запуск веб-сервера"""
-    app = create_web_app()
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 3000)
-    await site.start()
-    print("Web server started on port 3000")
+    try:
+        app = create_web_app()
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', 3000)
+        await site.start()
+        logger.info("Web server started on port 3000")
+    except OSError as e:
+        logger.error(f"Failed to start web server: {e}")
+        raise
 
 
 async def main():
