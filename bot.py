@@ -155,11 +155,15 @@ def get_buy_keyboard(product_id: str) -> InlineKeyboardMarkup:
 
 
 async def create_lava_invoice(amount: float, order_id: str, username: str = None) -> str:
+    hook_url = f"{WEBHOOK_URL}/lava/webhook"
+    logger.info(f"WEBHOOK_URL env: {os.getenv('WEBHOOK_URL')}")
+    logger.info(f"WEBHOOK_URL processed: {WEBHOOK_URL}")
+    logger.info(f"Hook URL: {hook_url}")
     body = {
         "shopId": LAVA_SHOP_ID,
         "sum": float(amount),
         "orderId": order_id,
-        "hookUrl": f"{WEBHOOK_URL}/lava/webhook",
+        "hookUrl": hook_url,
     }
     if username:
         body["comment"] = f"Order from @{username}"
