@@ -29,7 +29,7 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 LAVA_SHOP_ID = os.getenv('LAVA_SHOP_ID')
 LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')
 LAVA_ADDITIONAL_KEY = os.getenv('LAVA_ADDITIONAL_KEY')
-WEBHOOK_URL = os.getenv('WEBHOOK_URL')
+WEBHOOK_URL = os.getenv('WEBHOOK_URL', '').rstrip('/')
 if not WEBHOOK_URL:
     WEBHOOK_URL = "https://placeholder.bothost.ru"  # Fallback, real value set via env var
 
