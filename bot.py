@@ -411,8 +411,11 @@ async def start_web():
 
 
 async def main():
-    """Запуск бота (polling)"""
-    await start_bot()
+    """Запуск бота (polling) и веб-сервера параллельно"""
+    await asyncio.gather(
+        start_bot(),
+        start_web()
+    )
 
 
 if __name__ == "__main__":
