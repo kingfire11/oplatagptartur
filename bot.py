@@ -401,7 +401,8 @@ async def start_web():
         app = create_web_app()
         runner = web.AppRunner(app)
         await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', 3000)
+        port = int(os.getenv('PORT', '3000'))
+        site = web.TCPSite(runner, '0.0.0.0', port)
         await site.start()
         logger.info("Web server started on port 3000")
     except OSError as e:
