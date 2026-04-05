@@ -31,7 +31,7 @@ LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')
 LAVA_ADDITIONAL_KEY = os.getenv('LAVA_ADDITIONAL_KEY')
 WEBHOOK_URL = os.getenv('WEBHOOK_URL')
 if not WEBHOOK_URL:
-    raise ValueError("WEBHOOK_URL не установлен! Добавьте переменную окружения WEBHOOK_URL")
+    WEBHOOK_URL = "https://placeholder.bothost.ru"  # Fallback, real value set via env var
 
 ADMIN_ID = int(os.getenv('ADMIN_ID', '6499414636'))
 LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
@@ -411,11 +411,8 @@ async def start_web():
 
 
 async def main():
-    """Запуск обоих процессов параллельно"""
-    await asyncio.gather(
-        start_bot(),
-        start_web()
-    )
+    """Запуск бота (polling)"""
+    await start_bot()
 
 
 if __name__ == "__main__":
