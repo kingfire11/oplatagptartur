@@ -6,7 +6,6 @@ import asyncio
 import time
 import re
 import logging
-from aiohttp import web
 import aiohttp
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -31,15 +30,10 @@ LAVA_SECRET_KEY = os.getenv('LAVA_SECRET_KEY')
 LAVA_ADDITIONAL_KEY = os.getenv('LAVA_ADDITIONAL_KEY')
 WEBHOOK_URL = os.getenv('WEBHOOK_URL', '').rstrip('/')
 if not WEBHOOK_URL:
-    WEBHOOK_URL = "https://placeholder.bothost.ru"  # Fallback, real value set via env var
-
+    WEBHOOK_URL = "https://placeholder.bothost.ru"
 ADMIN_ID = int(os.getenv('ADMIN_ID', '6499414636'))
 LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
 
-# Защита от дублирования webhook
-_processed_orders: set = set()
-
-# Rate limiting: {user_id: timestamp}
 _last_request_time: dict[int, float] = {}
 RATE_LIMIT_SECONDS = 30
 
@@ -61,66 +55,6 @@ def check_rate_limit(user_id: int) -> bool:
 def sanitize_html(text: str) -> str:
     """Экранирует спецсимволы для HTML parse_mode"""
     return html_escape(str(text))
-
-
-# ==================== LAVA WEBHOOK ====================
-
-def verify_lava_signature(body: bytes, signature: str) -> bool:
-    """Проверяет подпись webhook от Lava"""
-    expected_signature = hmac.new(
-        LAVA_SECRET_KEY.encode(),
-        body,
-        hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(expected_signature, signature)
-
-
-async def handle_lava_webhook(request):
-    """Обработчик webhook от Lava"""
-    try:
-        body = await request.read()
-        signature = request.headers.get('Authorization', '') or request.headers.get('Signature', '')
-        if signature.startswith('Bearer '):
-            signature = signature[7:]
-
-        if signature and not verify_lava_signature(body, signature):
-            logger.warning("Invalid webhook signature")
-            return web.json_response({'error': 'Invalid signature'}, status=403)
-
-        data = json.loads(body)
-        logger.info(f"Webhook received: {data}")
-
-        order_id = data.get('orderId')
-        amount = data.get('sum')
-        status = data.get('status')
-
-        # Защита от дублирования уведомлений
-        if status == 1:
-            if order_id in _processed_orders:
-                logger.info(f"Duplicate webhook for order {order_id}, skipping")
-                return web.json_response({'status': 'ok'})
-
-            _processed_orders.add(order_id)
-            await bot.send_message(
-                chat_id=ADMIN_ID,
-                text=(
-                    f"✅ <b>Оплата прошла успешно!</b>\n\n"
-                    f"📦 Заказ: {sanitize_html(order_id)}\n"
-                    f"💰 Сумма: {amount} ₽"
-                ),
-                parse_mode="HTML"
-            )
-            logger.info(f"Payment success: order={order_id}, amount={amount}")
-
-        return web.json_response({'status': 'ok'})
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return web.json_response({'error': 'Internal server error'}, status=500)
-
-
-async def handle_health(request):
-    return web.json_response({'status': 'ok'})
-
 
 # ==================== TELEGRAM BOT ====================
 
@@ -382,45 +316,9 @@ async def handle_docs(callback: types.CallbackQuery):
 
 # ==================== ЗАПУСК ====================
 
-async def start_bot():
-    """Запуск Telegram бота"""
+if __name__ == "__main__":
     try:
         logger.info("Starting Telegram bot...")
-        await dp.start_polling(bot)
+        asyncio.run(dp.start_polling(bot))
     except Exception as e:
         logger.error(f"Telegram bot error: {e}")
-
-
-def create_web_app():
-    """Создание веб-приложения для webhook"""
-    app = web.Application()
-    app.router.add_post('/lava/webhook', handle_lava_webhook)
-    app.router.add_get('/lava/health', handle_health)
-    return app
-
-
-async def start_web():
-    """Запуск веб-сервера"""
-    try:
-        app = create_web_app()
-        runner = web.AppRunner(app)
-        await runner.setup()
-        port = int(os.getenv('PORT', '3000'))
-        site = web.TCPSite(runner, '0.0.0.0', port)
-        await site.start()
-        logger.info("Web server started on port 3000")
-    except OSError as e:
-        logger.error(f"Failed to start web server: {e}")
-        raise
-
-
-async def main():
-    """Запуск бота (polling) и веб-сервера параллельно"""
-    await asyncio.gather(
-        start_bot(),
-        start_web()
-    )
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
