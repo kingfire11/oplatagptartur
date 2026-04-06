@@ -152,6 +152,7 @@ def sanitize_html(text: str) -> str:
 
 async def create_lava_invoice(amount: float, order_id: str, username: str = None) -> str:
     hook_url = f"{WEBHOOK_URL}/lava/webhook"
+    logger.info(f"Hook URL for Lava: {hook_url}")
     body = {
         "shopId": LAVA_SHOP_ID,
         "sum": float(amount),
