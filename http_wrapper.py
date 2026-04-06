@@ -92,5 +92,36 @@ def create_app():
 
 
 if __name__ == '__main__':
+    import subprocess
+    import threading
+
     app = create_app()
+
+    def run_bot():
+        """Запускает бот как subprocess"""
+        try:
+            import time
+            time.sleep(2)  # Даем серверу время запуститься
+            print("Starting bot.py...")
+            process = subprocess.Popen(
+                ["python", "bot.py"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            # Логируем вывод бота
+            def log_output(pipe, prefix):
+                for line in iter(pipe.readline, ""):
+                    if line:
+                        print(f"[{prefix}] {line.rstrip()}")
+            threading.Thread(target=lambda: log_output(process.stdout, "BOT"), daemon=True).start()
+            threading.Thread(target=lambda: log_output(process.stderr, "BOT-ERR"), daemon=True).start()
+            print("Bot started successfully")
+        except Exception as e:
+            print(f"Failed to start bot: {e}")
+
+    # Запускаем бот в отдельном потоке
+    threading.Thread(target=run_bot, daemon=True).start()
+
+    print("Starting webhook server on port 8080...")
     web.run_app(app, host='0.0.0.0', port=8080)
