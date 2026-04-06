@@ -7,6 +7,7 @@ import time
 import re
 import logging
 import aiohttp
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -34,27 +35,75 @@ if not WEBHOOK_URL:
 ADMIN_ID = int(os.getenv('ADMIN_ID', '6499414636'))
 LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
 
+_bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 _last_request_time: dict[int, float] = {}
 RATE_LIMIT_SECONDS = 30
 
+# Защита от дублирования webhook
+_processed_orders: set = set()
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 
-def check_rate_limit(user_id: int) -> bool:
-    """Проверяет, не превышен ли лимит запросов. Возвращает True если можно продолжать"""
-    now = time.time()
-    last_time = _last_request_time.get(user_id, 0)
-    if now - last_time < RATE_LIMIT_SECONDS:
-        return False
-    _last_request_time[user_id] = now
-    return True
+# ==================== LAVA WEBHOOK ====================
+
+def verify_lava_signature(body: bytes, signature: str) -> bool:
+    expected_signature = hmac.new(
+        LAVA_SECRET_KEY.encode(),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected_signature, signature)
 
 
-def sanitize_html(text: str) -> str:
-    """Экранирует спецсимволы для HTML parse_mode"""
-    return html_escape(str(text))
+async def handle_lava_webhook(request):
+    try:
+        body = await request.read()
+        signature = request.headers.get('Authorization', '') or request.headers.get('Signature', '')
+        if signature.startswith('Bearer '):
+            signature = signature[7:]
+
+        if signature and not verify_lava_signature(body, signature):
+            logger.warning("Invalid webhook signature")
+            return web.json_response({'error': 'Invalid signature'}, status=403)
+
+        data = json.loads(body)
+        logger.info(f"Webhook received: {data}")
+
+        order_id = data.get('orderId')
+        amount = data.get('sum')
+        status = data.get('status')
+
+        if status == 1:
+            if order_id in _processed_orders:
+                logger.info(f"Duplicate webhook for order {order_id}, skipping")
+                return web.json_response({'status': 'ok'})
+
+            _processed_orders.add(order_id)
+            async with aiohttp.ClientSession() as session:
+                await session.post(_bot_url, json={
+                    'chat_id': ADMIN_ID,
+                    'text': (
+                        f"✅ <b>Оплата прошла успешно!</b>\n\n"
+                        f"📦 Заказ: {order_id}\n"
+                        f"💰 Сумма: {amount} ₽"
+                    ),
+                    'parse_mode': 'HTML'
+                })
+            logger.info(f"Payment success: order={order_id}, amount={amount}")
+        else:
+            logger.info(f"Payment pending: order={order_id}, status={status}")
+
+        return web.json_response({'status': 'ok'})
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return web.json_response({'error': 'Internal server error'}, status=500)
+
+
+async def handle_health(request):
+    return web.json_response({'status': 'ok'})
+
 
 # ==================== TELEGRAM BOT ====================
 
@@ -88,11 +137,21 @@ def get_buy_keyboard(product_id: str) -> InlineKeyboardMarkup:
     return keyboard
 
 
+def check_rate_limit(user_id: int) -> bool:
+    now = time.time()
+    last_time = _last_request_time.get(user_id, 0)
+    if now - last_time < RATE_LIMIT_SECONDS:
+        return False
+    _last_request_time[user_id] = now
+    return True
+
+
+def sanitize_html(text: str) -> str:
+    return html_escape(str(text))
+
+
 async def create_lava_invoice(amount: float, order_id: str, username: str = None) -> str:
     hook_url = f"{WEBHOOK_URL}/lava/webhook"
-    logger.info(f"WEBHOOK_URL env: {os.getenv('WEBHOOK_URL')}")
-    logger.info(f"WEBHOOK_URL processed: {WEBHOOK_URL}")
-    logger.info(f"Hook URL: {hook_url}")
     body = {
         "shopId": LAVA_SHOP_ID,
         "sum": float(amount),
@@ -146,7 +205,6 @@ async def handle_text(message: types.Message):
         username = match.group(1)
         amount = int(match.group(2))
 
-        # Валидация суммы
         if amount <= 0:
             await message.answer("❌ Сумма должна быть больше 0.")
             return
@@ -154,7 +212,6 @@ async def handle_text(message: types.Message):
             await message.answer("❌ Максимальная сумма — 100 000 ₽.")
             return
 
-        # Rate limiting
         if not check_rate_limit(message.from_user.id):
             await message.answer("⏳ Подождите 30 секунд между запросами.")
             return
@@ -252,7 +309,6 @@ async def handle_buy(callback: types.CallbackQuery):
         username = callback.from_user.username
         buyer = callback.from_user
 
-        # Rate limiting
         if not check_rate_limit(buyer.id):
             await callback.answer("Подождите 30 секунд между запросами", show_alert=False)
             return
@@ -316,9 +372,29 @@ async def handle_docs(callback: types.CallbackQuery):
 
 # ==================== ЗАПУСК ====================
 
+async def start_bot():
+    logger.info("Starting Telegram bot polling...")
+    await dp.start_polling(bot)
+
+
+async def start_web():
+    port = int(os.getenv('PORT', '8080'))
+    app = web.Application()
+    app.router.add_post('/lava/webhook', handle_lava_webhook)
+    app.router.add_get('/lava/health', handle_health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logger.info(f"Webhook server started on port {port}")
+
+
+async def main():
+    await asyncio.gather(
+        start_bot(),
+        start_web()
+    )
+
+
 if __name__ == "__main__":
-    try:
-        logger.info("Starting Telegram bot...")
-        asyncio.run(dp.start_polling(bot))
-    except Exception as e:
-        logger.error(f"Telegram bot error: {e}")
+    asyncio.run(main())
