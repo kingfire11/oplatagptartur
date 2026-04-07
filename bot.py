@@ -63,8 +63,11 @@ def verify_lava_sign(data: dict) -> bool:
 
 async def handle_lava_webhook(request):
     try:
-        data = await request.json()
-        logger.info(f"Webhook received: {data}")
+        raw = await request.read()
+        logger.info(f"Webhook raw body: {raw.decode('utf-8', errors='replace')}")
+
+        data = json.loads(raw)
+        logger.info(f"Webhook parsed: {data}")
 
         if not verify_lava_sign(data):
             logger.warning("Invalid webhook sign")
@@ -75,8 +78,12 @@ async def handle_lava_webhook(request):
         amount = data.get('amount')
         status = data.get('status')
         credited = data.get('credited')
+        invoice_id = data.get('invoice_id')
 
-        if webhook_type == 1 and status == 'success':
+        logger.info(f"Webhook fields: type={webhook_type}, order_id={order_id}, invoice_id={invoice_id}, status={status}, amount={amount}")
+
+        # type=1 (счёт) или без type + статус "success"/"paid"
+        if status in ('success', 'paid') and (webhook_type is None or webhook_type == 1):
             if order_id in _processed_orders:
                 logger.info(f"Duplicate webhook for order {order_id}, skipping")
                 return web.json_response({'status': 'ok'})
@@ -85,24 +92,25 @@ async def handle_lava_webhook(request):
             text = (
                 f"✅ <b>Оплата прошла успешно!</b>\n\n"
                 f"📦 Заказ: {order_id}\n"
+                f"🆔 Инвойс: {invoice_id}\n"
                 f"💰 Сумма: {amount} ₽"
             )
             if credited:
                 text += f"\n📥 Зачислено: {credited} ₽"
 
-            async with aiohttp.ClientSession() as session:
-                await session.post(_bot_url, json={
-                    'chat_id': ADMIN_ID,
-                    'text': text,
-                    'parse_mode': 'HTML'
-                })
+            await bot.send_message(
+                chat_id=ADMIN_ID,
+                text=text,
+                parse_mode="HTML"
+            )
+
             logger.info(f"Payment success: order={order_id}, amount={amount}, credited={credited}")
         else:
-            logger.info(f"Payment pending: order={order_id}, status={status}")
+            logger.info(f"Payment not success: order={order_id}, status={status}")
 
         return web.json_response({'status': 'ok'})
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
+        logger.error(f"Webhook error: {e}", exc_info=True)
         return web.json_response({'error': 'Internal server error'}, status=500)
 
 
