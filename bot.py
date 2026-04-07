@@ -163,9 +163,9 @@ def sanitize_html(text: str) -> str:
     return html_escape(str(text))
 
 
-async def create_lava_invoice(amount: float, order_id: str, username: str = None) -> str:
+async def create_lava_invoice(amount: float, order_id: str, username: str = None) -> tuple:
+    """Создаёт счёт и возвращает (payment_url, invoice_id)"""
     hook_url = f"{WEBHOOK_URL}/lava/webhook"
-    logger.info(f"Hook URL for Lava: {hook_url}")
     body = {
         "shopId": LAVA_SHOP_ID,
         "sum": float(amount),
@@ -188,9 +188,68 @@ async def create_lava_invoice(amount: float, order_id: str, username: str = None
         async with session.post(LAVA_API_URL, json=body, headers=headers) as response:
             result = await response.json()
             if result.get("status") == 200 or result.get("status_check") == True:
-                return result.get("data", {}).get("url")
+                data = result.get("data", {})
+                return data.get("url"), data.get("id")
             else:
                 raise Exception(f"Lava API error: {result.get('error', 'Unknown error')}")
+
+
+async def check_invoice_status(invoice_id: str) -> str:
+    """Проверяет статус счёта через Lava API"""
+    # Пробуем POST с подписью
+    body = {
+        "shopId": LAVA_SHOP_ID,
+        "invoice_id": invoice_id
+    }
+    body_json = json.dumps(body)
+    signature = hmac.new(LAVA_SECRET_KEY.encode(), body_json.encode(), hashlib.sha256).hexdigest()
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Signature": signature
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post("https://api.lava.ru/business/invoice/get", json=body, headers=headers) as response:
+                result = await response.json()
+                logger.info(f"Invoice status check result: {result}")
+                data = result.get("data", {})
+                status_raw = data.get("status") or result.get("status_check")
+                if status_raw is not None:
+                    return str(status_raw).lower()
+                return "unknown"
+    except Exception as e:
+        logger.warning(f"Failed to check invoice status via API: {e}")
+        return "unknown"
+
+
+async def poll_payment_status(order_id: str, invoice_id: str, amount: float, sender_id: int):
+    """Фоновая проверка статуса оплаты. Проверяет каждые 15 секунд до 30 минут"""
+    max_checks = 120  # 30 минут
+    for attempt in range(max_checks):
+        await asyncio.sleep(15)
+
+        try:
+            status = await check_invoice_status(invoice_id)
+            logger.info(f"Poll check #{attempt+1}: order={order_id}, invoice={invoice_id}, status={status}")
+
+            if status in ("success", "paid", "1"):
+                if order_id not in _processed_orders:
+                    _processed_orders.add(order_id)
+                    text = (
+                        f"✅ <b>Оплата прошла успешно!</b>\n\n"
+                        f"📦 Заказ: {order_id}\n"
+                        f"💰 Сумма: {amount} ₽"
+                    )
+                    await bot.send_message(chat_id=sender_id, text=text, parse_mode="HTML")
+                    logger.info(f"Notified admin about payment: order={order_id}")
+                return
+        except Exception as e:
+            logger.error(f"Poll check failed for order {order_id}: {e}")
+
+    logger.info(f"Poll timeout for order {order_id} after 30 minutes")
 
 
 @dp.message(Command("start"))
@@ -233,7 +292,7 @@ async def handle_text(message: types.Message):
         order_id = f"order_{int(time.time())}"
 
         try:
-            payment_link = await create_lava_invoice(amount, order_id, username)
+            payment_link, invoice_id = await create_lava_invoice(amount, order_id, username)
             buyer = message.from_user
             await bot.send_message(
                 chat_id=ADMIN_ID,
@@ -245,6 +304,9 @@ async def handle_text(message: types.Message):
                     f"💰 Сумма: {amount} ₽"
                 ),
                 parse_mode="HTML"
+            )
+            asyncio.create_task(
+                poll_payment_status(order_id, invoice_id, amount, ADMIN_ID)
             )
             logger.info(f"Order created by {buyer.id}: {order_id}, {amount}₽")
         except Exception as e:
@@ -328,7 +390,7 @@ async def handle_buy(callback: types.CallbackQuery):
             return
 
         try:
-            payment_link = await create_lava_invoice(amount_rub, order_id, username)
+            payment_link, invoice_id = await create_lava_invoice(amount_rub, order_id, username)
             await bot.send_message(
                 chat_id=ADMIN_ID,
                 text=(
@@ -340,6 +402,9 @@ async def handle_buy(callback: types.CallbackQuery):
                     f"💰 Цена: {amount_rub} ₽"
                 ),
                 parse_mode="HTML"
+            )
+            asyncio.create_task(
+                poll_payment_status(order_id, invoice_id, amount_rub, ADMIN_ID)
             )
             logger.info(f"Purchase by {buyer.id}: {product['name']}, {amount_rub}₽")
         except Exception as e:
