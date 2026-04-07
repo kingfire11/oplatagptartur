@@ -48,50 +48,55 @@ dp = Dispatcher()
 
 # ==================== LAVA WEBHOOK ====================
 
-def verify_lava_signature(body: bytes, signature: str) -> bool:
-    expected_signature = hmac.new(
-        LAVA_SECRET_KEY.encode(),
-        body,
-        hashlib.sha256
+def verify_lava_sign(data: dict) -> bool:
+    """Проверяет подпись Lava: md5("invoice_id:amount:pay_time:secret_key_2")"""
+    sign = data.get('sign')
+    if not sign:
+        logger.warning("Webhook received without sign")
+        return True  # Если secret_key_2 не задан, Lava не шлёт sign
+
+    expected = hashlib.md5(
+        f"{data.get('invoice_id')}:{data.get('amount')}:{data.get('pay_time')}:{LAVA_ADDITIONAL_KEY}".encode()
     ).hexdigest()
-    return hmac.compare_digest(expected_signature, signature)
+    return hmac.compare_digest(expected.lower(), sign.lower())
 
 
 async def handle_lava_webhook(request):
     try:
-        body = await request.read()
-        signature = request.headers.get('Authorization', '') or request.headers.get('Signature', '')
-        if signature.startswith('Bearer '):
-            signature = signature[7:]
-
-        if signature and not verify_lava_signature(body, signature):
-            logger.warning("Invalid webhook signature")
-            return web.json_response({'error': 'Invalid signature'}, status=403)
-
-        data = json.loads(body)
+        data = await request.json()
         logger.info(f"Webhook received: {data}")
 
-        order_id = data.get('orderId')
-        amount = data.get('sum')
-        status = data.get('status')
+        if not verify_lava_sign(data):
+            logger.warning("Invalid webhook sign")
+            return web.json_response({'error': 'Invalid sign'}, status=403)
 
-        if status == 1:
+        webhook_type = data.get('type')
+        order_id = data.get('order_id')
+        amount = data.get('amount')
+        status = data.get('status')
+        credited = data.get('credited')
+
+        if webhook_type == 1 and status == 'success':
             if order_id in _processed_orders:
                 logger.info(f"Duplicate webhook for order {order_id}, skipping")
                 return web.json_response({'status': 'ok'})
 
             _processed_orders.add(order_id)
+            text = (
+                f"✅ <b>Оплата прошла успешно!</b>\n\n"
+                f"📦 Заказ: {order_id}\n"
+                f"💰 Сумма: {amount} ₽"
+            )
+            if credited:
+                text += f"\n📥 Зачислено: {credited} ₽"
+
             async with aiohttp.ClientSession() as session:
                 await session.post(_bot_url, json={
                     'chat_id': ADMIN_ID,
-                    'text': (
-                        f"✅ <b>Оплата прошла успешно!</b>\n\n"
-                        f"📦 Заказ: {order_id}\n"
-                        f"💰 Сумма: {amount} ₽"
-                    ),
+                    'text': text,
                     'parse_mode': 'HTML'
                 })
-            logger.info(f"Payment success: order={order_id}, amount={amount}")
+            logger.info(f"Payment success: order={order_id}, amount={amount}, credited={credited}")
         else:
             logger.info(f"Payment pending: order={order_id}, status={status}")
 
