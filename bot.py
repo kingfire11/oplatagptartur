@@ -35,9 +35,9 @@ if not WEBHOOK_URL:
 ADMIN_ID = int(os.getenv('ADMIN_ID', '6499414636'))
 LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
 
-for _var_name in ('BOT_TOKEN', 'LAVA_SHOP_ID', 'LAVA_SECRET_KEY'):
+for _var_name in ('LAVA_SHOP_ID', 'LAVA_SECRET_KEY'):
     if not os.getenv(_var_name):
-        raise RuntimeError(f"Missing required env variable: {_var_name}")
+        logger.warning(f"⚠️ Missing env variable: {_var_name} — payments will not work")
 
 _bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 _last_request_time: dict[int, float] = {}
@@ -169,6 +169,8 @@ def sanitize_html(text: str) -> str:
 
 async def create_lava_invoice(amount: float, order_id: str, username: str = None) -> tuple:
     """Создаёт счёт и возвращает (payment_url, invoice_id)"""
+    if not LAVA_SECRET_KEY or not LAVA_SHOP_ID:
+        raise Exception("LAVA_SECRET_KEY или LAVA_SHOP_ID не заданы в переменных окружения")
     hook_url = f"{WEBHOOK_URL}/lava/webhook"
     body = {
         "shopId": LAVA_SHOP_ID,
