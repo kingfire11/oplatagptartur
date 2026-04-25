@@ -35,6 +35,10 @@ if not WEBHOOK_URL:
 ADMIN_ID = int(os.getenv('ADMIN_ID', '6499414636'))
 LAVA_API_URL = "https://api.lava.ru/business/invoice/create"
 
+for _var_name in ('BOT_TOKEN', 'LAVA_SHOP_ID', 'LAVA_SECRET_KEY'):
+    if not os.getenv(_var_name):
+        raise RuntimeError(f"Missing required env variable: {_var_name}")
+
 _bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 _last_request_time: dict[int, float] = {}
 RATE_LIMIT_SECONDS = 30
