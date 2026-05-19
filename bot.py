@@ -261,7 +261,7 @@ async def poll_payment_status(order_id: str, invoice_id: str, amount: float, sen
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "👋 Привет! Я бот магазина Claude Code API.\n\n"
+        "👋 Привет! Я бот магазина Neuroshopsbot.\n\n"
         "Нажмите кнопку 💳 Купить, чтобы выбрать товар,\n"
         "или обратитесь в техподдержку за помощью.",
         reply_markup=get_main_keyboard()
@@ -336,7 +336,7 @@ async def handle_text(message: types.Message):
 @dp.callback_query(F.data == "docs_back")
 async def handle_back(callback: types.CallbackQuery):
     await callback.message.answer(
-        "👋 Привет! Я бот магазина Claude Code API.\n\n"
+        "👋 Привет! Я бот магазина Neuroshopsbot.\n\n"
         "Нажмите кнопку 💳 Купить, чтобы выбрать товар,\n"
         "или обратитесь в техподдержку за помощью.",
         reply_markup=get_main_keyboard()
@@ -358,7 +358,7 @@ async def handle_shop_main(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "main_menu")
 async def handle_main_menu(callback: types.CallbackQuery):
     await callback.message.answer(
-        "👋 Привет! Я бот магазина Claude Code API.\n\n"
+        "👋 Привет! Я бот магазина Neuroshopsbot.\n\n"
         "Нажмите кнопку 💳 Купить, чтобы выбрать товар,\n"
         "или обратитесь в техподдержку за помощью.",
         reply_markup=get_main_keyboard()
