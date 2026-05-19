@@ -138,9 +138,9 @@ def get_main_keyboard() -> InlineKeyboardMarkup:
 
 def get_products_keyboard() -> InlineKeyboardMarkup:
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💻 Claude Code API 3000$", callback_data="product_3000")],
-        [InlineKeyboardButton(text="💻 Claude Code API 5000$", callback_data="product_5000")],
-        [InlineKeyboardButton(text="💻 Claude Code API 10000$", callback_data="product_10000")],
+        [InlineKeyboardButton(text="🤖 GPT 100 млн токенов — 3000 ₽", callback_data="product_3000")],
+        [InlineKeyboardButton(text="🤖 GPT 200 млн токенов — 5700 ₽", callback_data="product_5700")],
+        [InlineKeyboardButton(text="🤖 GPT 300 млн токенов — 8400 ₽", callback_data="product_8400")],
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
     ])
     return keyboard
@@ -269,9 +269,9 @@ async def cmd_start(message: types.Message):
 
 
 PRODUCTS = {
-    "3000": {"name": "Claude Code API 3000$", "amount": 3000, "price_rub": 3000, "description": "Доступ к API Claude Code для разработки.\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с кредитами.\n\nКредиты не имеют срока действия и могут использоваться в любое время.\n\nДоступны модели:\n• Claude sonnet 4.6\n• Claude sonnet 4.5\n• Claude Opus 4.5\n• Claude Opus 4.6"},
-    "5000": {"name": "Claude Code API 5000$", "amount": 5000, "price_rub": 4500, "description": "Доступ к API Claude Code для разработки.\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с кредитами.\n\nКредиты не имеют срока действия и могут использоваться в любое время.\n\nДоступны модели:\n• Claude sonnet 4.6\n• Claude sonnet 4.5\n• Claude Opus 4.5\n• Claude Opus 4.6"},
-    "10000": {"name": "Claude Code API 10000$", "amount": 10000, "price_rub": 8000, "description": "Доступ к API Claude Code для разработки.\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с кредитами.\n\nКредиты не имеют срока действия и могут использоваться в любое время.\n\nДоступны модели:\n• Claude sonnet 4.6\n• Claude sonnet 4.5\n• Claude Opus 4.5\n• Claude Opus 4.6"}
+    "3000": {"name": "GPT 100 млн токенов", "amount": 3000, "price_rub": 3000, "description": "Доступ к GPT API.\n\n📦 100 000 000 токенов\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с токенами.\n\nТокены не имеют срока действия и могут использоваться в любое время."},
+    "5700": {"name": "GPT 200 млн токенов", "amount": 5700, "price_rub": 5700, "description": "Доступ к GPT API.\n\n📦 200 000 000 токенов\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с токенами.\n\nТокены не имеют срока действия и могут использоваться в любое время."},
+    "8400": {"name": "GPT 300 млн токенов", "amount": 8400, "price_rub": 8400, "description": "Доступ к GPT API.\n\n📦 300 000 000 токенов\n\nПодходит для:\n• Telegram-ботов\n• VS Code / Cursor / IDE\n• AI-ассистентов\n• автоматизации и генерации кода\n\nВы получаете API ключ с токенами.\n\nТокены не имеют срока действия и могут использоваться в любое время."}
 }
 
 
